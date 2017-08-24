@@ -1,22 +1,28 @@
 package main
 
 import (
-    "fmt"
+    "log"
     "time"
     "regexp"
     "github.com/hpcloud/tail"
     "strings"
+    "strconv"
+    "bytes"
 )
 
 var (
+    totalSize  uint64 = 0
     totalRequests_2min  uint32 = 0
-    requestsTrshld_2min uint32 = 5
-    isAlertState = false
-    sectionMap           = make(map[string]int)
-    httpStatus           = make(map[string]int)
+    isAlertState               = false
+    mapSection                 = make(map[string]int)
+    httpStatus                 = make(map[string]int)
 )
 
-type lineLog struct{
+const (
+    requestsTrshld_2min uint32 = 5
+)
+
+type lineStruct struct{
     remote_host_ip string
     identd         string
     user_id        string
@@ -28,37 +34,44 @@ type lineLog struct{
     size           string
 }
 
-
 func monitor(seconds uint32, fs ...func()){
     duration := time.Duration(seconds) * time.Second
     for {
         time.Sleep(duration)
         for _,f := range fs{
             go f()
-            fmt.Println("-----------------")
         }
     }
 }
 
 func browseMostViewedSections(){
-    for k,v := range sectionMap{
-        fmt.Println(k,v)
+    var buffer bytes.Buffer
+
+    for k,v := range mapSection {
+        buffer.WriteString("\n")
+        buffer.WriteString(k)
+        buffer.WriteString(" : ")
+        buffer.WriteString(strconv.Itoa(v))
     }
+    log.Println(buffer.String())
 }
 
-func displayTotalViews(){
-    fmt.Println("Total requests: ", totalRequests_2min)
+func displayTotalHTTPRequests(){
+    log.Println("Total HTTP requests :", totalRequests_2min)
 }
 
-func alert(){
+func displayTotalSizeEmitted(){
+    log.Println("Total Size emitted in bytes :", totalSize)
+}
+
+func manageAlerts(){
     if totalRequests_2min > requestsTrshld_2min {
         isAlertState = true
-        fmt.Println("High traffic generated an alert - hits =", totalRequests_2min,", triggered at", time.Now())
-    }
+        log.Println("High traffic generated an alert - hits =", totalRequests_2min,", triggered at", time.Now())
 
-    if isAlertState && totalRequests_2min < requestsTrshld_2min{
+    } else if isAlertState && totalRequests_2min < requestsTrshld_2min{
         isAlertState = false
-        fmt.Println("High traffic recovered at ", time.Now())
+        log.Println("High traffic recovered at", time.Now())
    }
 
     totalRequests_2min = 0
@@ -66,13 +79,13 @@ func alert(){
 
 func getSection(url string) string {
     sections := strings.Split(url, "/")
-    section := strings.Split(sections[1], "?")
+    section  := strings.Split(sections[1], "?")
 
     return "/"+section[0]
 }
 
-func lineParser(line string) (lineLog, error){
-    str := lineLog{}
+func lineToLogStruct(line string) (lineStruct, error){
+    str := lineStruct{}
 
     r := regexp.MustCompile(`^(?P<remote_host_ip>[\d\.]+) (?P<identd>.*) (?P<user_id>.*) \[(?P<date>.*)\] "(?P<method>.*) (?P<resource>.*) (?P<protocol>.*)" (?P<status>\d+) (?P<size>\d+)`)
     fields := r.FindStringSubmatch(line)
@@ -95,30 +108,50 @@ func lineParser(line string) (lineLog, error){
     return str,nil
 }
 
-func main(){
-    quickMonitoring := []func(){
-        browseMostViewedSections,
-        displayTotalViews,
-    }
-
-    go monitor(2, quickMonitoring...)
-    go monitor(10, alert)
-
-    t, err := tail.TailFile("l.log", tail.Config{
+func FollowLogFile(file string){
+    t, err := tail.TailFile(file, tail.Config{
         Follow:   true,
         ReOpen:   true,
     })
     if err != nil {
-        fmt.Println(err)
-        return
+        log.Panic(err)
     }
 
     for line := range t.Lines {
-        s, _ := lineParser(line.Text)
+        s, _ := lineToLogStruct(line.Text)
         section := getSection(s.resource)
 
+        // HTTP status counter (i.e : 200, 404, 500...)
         httpStatus[s.status] += 1
-        sectionMap[section]  += 1
+
+        // URL section counter (i.e : /pages : 4 )
+        mapSection[section]  += 1
+
+        // Increase number of requests (set at 0 every 2min)
         totalRequests_2min   += 1
+
+        size, err := strconv.ParseUint(s.size, 10, 64)
+        if err != nil {
+            panic(err)
+        }
+        totalSize += size
     }
+}
+
+func startMonitoring(){
+    quickMonitoring := []func(){
+        browseMostViewedSections,
+        displayTotalSizeEmitted,
+        displayTotalHTTPRequests,
+    }
+
+    go monitor(2, quickMonitoring...)
+    go monitor(10, manageAlerts)
+}
+
+func main(){
+
+    startMonitoring()
+    FollowLogFile("l.log")
+
 }
