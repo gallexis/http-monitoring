@@ -2,10 +2,16 @@ package main
 
 import (
     "fmt"
-    //"github.com/hpcloud/tail"
     "time"
     "regexp"
     "github.com/hpcloud/tail"
+    "strings"
+)
+
+var (
+    totalRequests uint32 = 0
+    sectionMap           = make(map[string]int)
+    httpStatus           = make(map[string]int)
 )
 
 type lineLog struct{
@@ -14,16 +20,45 @@ type lineLog struct{
     user_id        string
     date           time.Time
 
-    method, ressource, protocol        string
+    method, resource, protocol string
 
     status         string
     size           string
 }
 
-func parser(line string) (lineLog, error){
+
+func monitor(seconds uint32, fs ...func()){
+    duration := time.Duration(seconds) * time.Second
+    for {
+        time.Sleep(duration)
+        for _,f := range fs{
+            go f()
+            fmt.Println("-----------------")
+        }
+    }
+}
+
+func browseMostViewedSections(){
+    for k,v := range sectionMap{
+        fmt.Println(k,v)
+    }
+}
+
+func displayTotalViews(){
+    fmt.Println("Total requests: ", totalRequests)
+}
+
+func getSection(url string) string {
+    sections := strings.Split(url, "/")
+    section := strings.Split(sections[1], "?")
+
+    return "/"+section[0]
+}
+
+func lineParser(line string) (lineLog, error){
     str := lineLog{}
 
-    r := regexp.MustCompile(`^(?P<remote_host_ip>[\d\.]+) (?P<identd>.*) (?P<user_id>.*) \[(?P<date>.*)\] "(?P<method>.*) (?P<ressource>.*) (?P<protocol>.*)" (?P<status>\d+) (?P<size>\d+)`)
+    r := regexp.MustCompile(`^(?P<remote_host_ip>[\d\.]+) (?P<identd>.*) (?P<user_id>.*) \[(?P<date>.*)\] "(?P<method>.*) (?P<resource>.*) (?P<protocol>.*)" (?P<status>\d+) (?P<size>\d+)`)
     fields := r.FindStringSubmatch(line)
 
     str.remote_host_ip = fields[1]
@@ -36,20 +71,21 @@ func parser(line string) (lineLog, error){
     }
     str.date = t
     str.method = fields[5]
-    str.ressource = fields[6]
+    str.resource = fields[6]
     str.protocol = fields[7]
     str.status = fields[8]
     str.size = fields[9]
-
-    fmt.Println(str)
 
     return str,nil
 }
 
 func main(){
+    quickMonitoring := []func(){
+        browseMostViewedSections,
+        displayTotalViews,
+    }
 
-    //s := `127.0.0.1 useridentifier frank [10/Mar/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326`
-    //parser(s)
+    go monitor(2, quickMonitoring...)
 
     t, err := tail.TailFile("l.log", tail.Config{
         Follow:   true,
@@ -57,10 +93,15 @@ func main(){
     })
     if err != nil {
         fmt.Println(err)
+        return
     }
 
     for line := range t.Lines {
-        parser(line.Text)
-    }
+        s, _ := lineParser(line.Text)
+        section := getSection(s.resource)
 
+        httpStatus[s.status] += 1
+        sectionMap[section]  += 1
+        totalRequests        += 1
+    }
 }
