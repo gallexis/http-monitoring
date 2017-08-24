@@ -9,7 +9,9 @@ import (
 )
 
 var (
-    totalRequests uint32 = 0
+    totalRequests_2min  uint32 = 0
+    requestsTrshld_2min uint32 = 5
+    isAlertState = false
     sectionMap           = make(map[string]int)
     httpStatus           = make(map[string]int)
 )
@@ -45,7 +47,21 @@ func browseMostViewedSections(){
 }
 
 func displayTotalViews(){
-    fmt.Println("Total requests: ", totalRequests)
+    fmt.Println("Total requests: ", totalRequests_2min)
+}
+
+func alert(){
+    if totalRequests_2min > requestsTrshld_2min {
+        isAlertState = true
+        fmt.Println("High traffic generated an alert - hits =", totalRequests_2min,", triggered at", time.Now())
+    }
+
+    if isAlertState && totalRequests_2min < requestsTrshld_2min{
+        isAlertState = false
+        fmt.Println("High traffic recovered at ", time.Now())
+   }
+
+    totalRequests_2min = 0
 }
 
 func getSection(url string) string {
@@ -86,6 +102,7 @@ func main(){
     }
 
     go monitor(2, quickMonitoring...)
+    go monitor(10, alert)
 
     t, err := tail.TailFile("l.log", tail.Config{
         Follow:   true,
@@ -102,6 +119,6 @@ func main(){
 
         httpStatus[s.status] += 1
         sectionMap[section]  += 1
-        totalRequests        += 1
+        totalRequests_2min   += 1
     }
 }
