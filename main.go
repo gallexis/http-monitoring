@@ -12,14 +12,19 @@ import (
 
 var (
     totalSize  uint64 = 0
-    totalRequests_2min  uint32 = 0
+    totalRequests_2min  uint64 = 0
+    totalRequests       uint64 = 0
     isAlertState               = false
     mapSection                 = make(map[string]int)
     httpStatus                 = make(map[string]int)
+
+    Stats_chan                 = make(chan []string)
+    HighTrafficAlert_chan      = make(chan string)
+    lineLog_chan               = make(chan string)
 )
 
 const (
-    requestsTrshld_2min uint32 = 5
+    requestsTreshold uint64 = 25
 )
 
 type lineStruct struct{
@@ -33,7 +38,9 @@ type lineStruct struct{
     status         string
     size           string
 }
-
+/*
+    we can add many function which have the same trigger time, i.e: monitor( 10, f1, f2...)
+ */
 func monitor(seconds uint32, fs ...func()){
     duration := time.Duration(seconds) * time.Second
     for {
@@ -44,35 +51,47 @@ func monitor(seconds uint32, fs ...func()){
     }
 }
 
-func browseMostViewedSections(){
+func DisplayMostViewedSections() string{
     var buffer bytes.Buffer
 
     for k,v := range mapSection {
-        buffer.WriteString("\n")
         buffer.WriteString(k)
         buffer.WriteString(" : ")
         buffer.WriteString(strconv.Itoa(v))
+        buffer.WriteString(" - ")
     }
-    log.Println(buffer.String())
+
+    return buffer.String()
 }
 
-func displayTotalHTTPRequests(){
-    log.Println("Total HTTP requests :", totalRequests_2min)
+func DisplayTotalHTTPRequests() string{
+    return "Total HTTP requests : " + strconv.FormatUint(totalRequests, 10)
 }
 
-func displayTotalSizeEmitted(){
-    log.Println("Total Size emitted in bytes :", totalSize)
+func DisplayTotalSizeEmitted() string{
+    return "Total Size emitted in bytes : " + strconv.FormatUint(totalSize, 10)
+}
+
+func manageStatistics(){
+    stats := []string{
+        DisplayTotalHTTPRequests(),
+        DisplayTotalSizeEmitted(),
+        DisplayMostViewedSections(),
+    }
+
+    Stats_chan <- stats
 }
 
 func manageAlerts(){
-    if totalRequests_2min > requestsTrshld_2min {
+    if totalRequests_2min > requestsTreshold {
         isAlertState = true
-        log.Println("High traffic generated an alert - hits =", totalRequests_2min,", triggered at", time.Now())
+        HighTrafficAlert_chan <- "[" + time.Now().String() + " : High traffic generated an alert - hits = " +
+            strconv.FormatUint(totalRequests_2min, 10) + "](fg-white,bg-red)"
 
-    } else if isAlertState && totalRequests_2min < requestsTrshld_2min{
+    } else if isAlertState && totalRequests_2min < requestsTreshold {
         isAlertState = false
-        log.Println("High traffic recovered at", time.Now())
-   }
+        HighTrafficAlert_chan <- "[" + time.Now().String() + " : High traffic recovered.](fg-white,bg-green)"
+    }
 
     totalRequests_2min = 0
 }
@@ -109,15 +128,18 @@ func lineToLogStruct(line string) (lineStruct, error){
 }
 
 func FollowLogFile(file string){
+
     t, err := tail.TailFile(file, tail.Config{
         Follow:   true,
         ReOpen:   true,
+        Logger: tail.DiscardingLogger,
     })
     if err != nil {
         log.Panic(err)
     }
 
     for line := range t.Lines {
+        lineLog_chan <- line.Text
         s, _ := lineToLogStruct(line.Text)
         section := getSection(s.resource)
 
@@ -130,6 +152,9 @@ func FollowLogFile(file string){
         // Increase number of requests (set at 0 every 2min)
         totalRequests_2min   += 1
 
+        // Increase number of requests (set at 0 every 2min)
+        totalRequests   += 1
+
         size, err := strconv.ParseUint(s.size, 10, 64)
         if err != nil {
             panic(err)
@@ -139,18 +164,15 @@ func FollowLogFile(file string){
 }
 
 func startMonitoring(){
-    quickMonitoring := []func(){
-        browseMostViewedSections,
-        displayTotalSizeEmitted,
-        displayTotalHTTPRequests,
-    }
 
-    go monitor(2, quickMonitoring...)
+    go monitor(2, manageStatistics)
     go monitor(10, manageAlerts)
+
 }
 
 func main(){
 
+    go Gui()
     startMonitoring()
     FollowLogFile("l.log")
 
