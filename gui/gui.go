@@ -101,11 +101,11 @@ func setUI() {
 func uiLoop(){
     for {
         select {
-        case s := <- monitoring.Stats_chan:
+        case s := <- monitoring.MonitoringDataChan:
             stats := []string{
                 fmt.Sprintf(TotalHTTPRequests, s.TotalRequests),
                 fmt.Sprintf(TotalSizeEmitted, s.TotalSize),
-                getMostViewedSections(s.MapSection),
+                getMostViewedSections(s.MapURLsection),
             }
             Statistics.Items = stats
 

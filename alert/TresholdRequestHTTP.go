@@ -7,7 +7,7 @@ import (
 )
 
 const (
-    requestsThreshold uint64 = 25
+    RequestsThreshold uint64 = 25
 )
 
 var (
@@ -16,24 +16,24 @@ var (
 )
 
 var (
-    isAlertState          = false
-    HighTrafficAlert_chan = make(chan string)
-    oldTotalRequests   uint64 = 0
+    IsAlertState                 = false
+    HighTrafficAlert_chan        = make(chan string, 1)
+    oldTotalRequests      uint64 = 0
 )
 
 func AlertThresholdHTTP() {
-    monitoring.MonitoringD.Mux.Lock()
-    diff := monitoring.MonitoringD.TotalRequests - oldTotalRequests
+    monitoring.MonitoringDataStruct.Mux.Lock()
+    diff := monitoring.MonitoringDataStruct.TotalRequests - oldTotalRequests
 
-    if diff > requestsThreshold {
-        isAlertState = true
+    if diff >= RequestsThreshold {
+        IsAlertState = true
         HighTrafficAlert_chan <- fmt.Sprintf(alertTraffic, time.Now().String(), diff)
 
-    } else if isAlertState && diff < requestsThreshold {
-        isAlertState = false
+    } else if IsAlertState && diff < RequestsThreshold {
+        IsAlertState = false
         HighTrafficAlert_chan <- fmt.Sprintf(recoveredTraffic, time.Now().String())
     }
 
-    oldTotalRequests = monitoring.MonitoringD.TotalRequests
-    monitoring.MonitoringD.Mux.Unlock()
+    oldTotalRequests = monitoring.MonitoringDataStruct.TotalRequests
+    monitoring.MonitoringDataStruct.Mux.Unlock()
 }

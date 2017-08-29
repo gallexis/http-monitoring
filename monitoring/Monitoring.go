@@ -7,27 +7,27 @@ import (
     "sync"
 )
 
-type MonitoringData struct{
+type monitoringData struct{
     TotalSize     uint64
     TotalRequests uint64
-    MapSection    map[string]int
-    HttpStatus    map[string]int
+    MapURLsection map[string]int
+    MapHTTPstatus map[string]int
     Mux           sync.Mutex
 }
 
-var MonitoringD MonitoringData = MonitoringData{
-    TotalSize:0,
-    TotalRequests:0,
-    MapSection: make( map[string]int),
-    HttpStatus:make(map[string]int) ,
+var MonitoringDataStruct = monitoringData{
+    TotalSize:     0,
+    TotalRequests: 0,
+    MapURLsection: make(map[string]int),
+    MapHTTPstatus: make(map[string]int) ,
 }
 
 var (
-    Stats_chan = make(chan MonitoringData)
+    MonitoringDataChan = make(chan monitoringData,1)
 )
 
 /*
-    we can add many function which have the same trigger time, i.e: monitor( 10, f1, f2...)
+    we can add many functions which have the same trigger time, i.e: Monitor( 10, f1, f2, f3...)
  */
 func Monitor(seconds uint32, fs ...func()){
     duration := time.Duration(seconds) * time.Second
@@ -39,10 +39,10 @@ func Monitor(seconds uint32, fs ...func()){
     }
 }
 
-func SendMonitoringToUI(){
-    MonitoringD.Mux.Lock()
-    Stats_chan <- MonitoringD
-    MonitoringD.Mux.Unlock()
+func SendMonitoringDataToUI(){
+    MonitoringDataStruct.Mux.Lock()
+    MonitoringDataChan <- MonitoringDataStruct
+    MonitoringDataStruct.Mux.Unlock()
 }
 
 func FollowLogFile(file string){
@@ -50,7 +50,7 @@ func FollowLogFile(file string){
     t, err := tail.TailFile(file, tail.Config{
         Follow:   true,
         ReOpen:   true,
-        Logger: tail.DiscardingLogger,
+        Logger:   tail.DiscardingLogger,
     })
     if err != nil {
         log.Panic(err)
@@ -63,7 +63,6 @@ func FollowLogFile(file string){
             // log
             continue
         }
-
-        UpdateData(s)
+        UpdateMonitoringDataStruct(s)
     }
 }

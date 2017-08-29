@@ -8,7 +8,7 @@ import (
 
 func main(){
 
-    go monitoring.Monitor(2,  monitoring.SendMonitoringToUI)
+    go monitoring.Monitor(2,  monitoring.SendMonitoringDataToUI)
     go monitoring.Monitor(10, alert.AlertThresholdHTTP)
 
     go gui.Gui()

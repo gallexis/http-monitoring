@@ -7,7 +7,7 @@ import (
 )
 
 var (
-    LineLog_chan               = make(chan string)
+    LineLog_chan               = make(chan string, 1)
 )
 
 type LineStruct struct{
