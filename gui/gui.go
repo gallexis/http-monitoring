@@ -8,14 +8,20 @@ import (
     "sort"
     "strconv"
     "fmt"
-    "http-monitoring/alert"
+    "http-monitoring/alerts"
+    "log"
 )
 
+/*
+    Arrays of strings used to display the contents of the previous alerts messages and the current lines parsed
+    from the file log
+*/
 var (
     Alerts   = []string{}
     LogLines = []string{}
 )
 
+// UI Layouts
 var (
     LastAlert      = termui.NewPar("")
     Statistics     = termui.NewList()
@@ -24,44 +30,76 @@ var (
     Info           = termui.NewPar("Press 'Q' to quit.")
 )
 
-var(
+var (
     TotalHTTPRequests  = "Total HTTP requests : %d"
     TotalSizeEmitted   = "Total Size emitted in bytes : %d"
-    MostViewedSections = "Most viewed sections: %s"
+    MostViewedSections = "Most viewed sections : %s"
+    HTTPstatus         = "HTTP Status : %s"
 )
 
+// Structure used for the ordering functions of a map[string]int
+type Pair struct {
+    Key   string
+    Value int
+}
 
-func getMostViewedSections(mapSection map[string]int) string {
-    type sectionByHits struct {
-        Section string
-        Hits    int
+/*
+    When ordering the map, we first put each of its key/value in a Pair structure.
+    Each of these Pair structures will be put in an array, then sorted by Value
+*/
+func orderMapByValue(m map[string]int) []Pair {
+    var array []Pair
+
+    for k, v := range m {
+        array = append(array, Pair{k, v})
     }
-    var buffer bytes.Buffer
-    var ss []sectionByHits
 
-    for k, v := range mapSection {
-        ss = append(ss, sectionByHits{k, v})
-    }
-
-    sort.Slice(ss, func(i, j int) bool {
-        return ss[i].Hits > ss[j].Hits
+    sort.Slice(array, func(i, j int) bool {
+        return array[i].Value > array[j].Value
     })
 
-    for i, kv := range ss {
-        if i > 2{
+    return array
+}
+
+// Get a string displaying the most viewed section of the site, ordered from the highest to the lower
+func getMostViewedSections(mapSection map[string]int) string {
+    var buffer bytes.Buffer
+    orderedArray := orderMapByValue(mapSection)
+
+    for i, kv := range orderedArray {
+        if i > 2 {
             break
         }
         buffer.WriteString("[")
-        buffer.WriteString(kv.Section)
+        buffer.WriteString(kv.Key)
         buffer.WriteString(" : ")
-        buffer.WriteString(strconv.Itoa(kv.Hits))
+        buffer.WriteString(strconv.Itoa(kv.Value))
         buffer.WriteString("] ")
     }
 
     return fmt.Sprintf(MostViewedSections, buffer.String())
 }
 
-func setUI() {
+// Get a string displaying the HTTP status of the site, ordered from the highest to the lower
+func getHTTPstatus(mapHTTPstatus map[string]int) string {
+    var buffer bytes.Buffer
+    orderedArray := orderMapByValue(mapHTTPstatus)
+
+    for i, kv := range orderedArray {
+        if i > 4 {
+            break
+        }
+        buffer.WriteString("[")
+        buffer.WriteString(kv.Key)
+        buffer.WriteString(" : ")
+        buffer.WriteString(strconv.Itoa(kv.Value))
+        buffer.WriteString("] ")
+    }
+
+    return fmt.Sprintf(HTTPstatus, buffer.String())
+}
+
+func displayUI() {
     LastAlert.Height = 3
     LastAlert.BorderLabel = "Last Alert"
 
@@ -95,21 +133,25 @@ func setUI() {
 
     // calculate layout
     termui.Body.Align()
-
 }
 
-func uiLoop(){
+// Every time we receive something from a channel, we update the GUI
+func uiLoop() {
     for {
         select {
-        case s := <- monitoring.MonitoringDataChan:
+
+        // Update the statistics
+        case s := <-monitoring.MonitoringData_chan:
             stats := []string{
                 fmt.Sprintf(TotalHTTPRequests, s.TotalRequests),
                 fmt.Sprintf(TotalSizeEmitted, s.TotalSize),
+                getHTTPstatus(s.MapHTTPstatus),
                 getMostViewedSections(s.MapURLsection),
             }
             Statistics.Items = stats
 
-        case s := <- alert.HighTrafficAlert_chan:
+            // Update the "LastAlert", and append it to "AlertsHistoric"
+        case s := <-alerts.HighTrafficAlert_chan:
             LastAlert.Text = s
             if len(Alerts) > 4 {
                 Alerts = Alerts[1:]
@@ -117,7 +159,8 @@ func uiLoop(){
             Alerts = append(Alerts, s)
             AlertsHistoric.Items = Alerts
 
-        case s := <- monitoring.LineLog_chan:
+            // Update the "LineLogs" with the latest line received then parsed from the log file
+        case s := <-monitoring.LineLog_chan:
             if len(LogLines) > 9 {
                 LogLines = LogLines[1:]
             }
@@ -125,25 +168,37 @@ func uiLoop(){
             Logs.Items = LogLines
         }
 
-        // Every time something changes -> update the GUI
+        // Refresh the UI with the updated data
         termui.Render(termui.Body)
     }
+}
+
+func cleanExit() {
+    termui.Close()
+
+    close(alerts.HighTrafficAlert_chan)
+    close(monitoring.LineLog_chan)
+    close(monitoring.MonitoringData_chan)
+
+    os.Exit(0)
 }
 
 func Gui() {
     err := termui.Init()
     if err != nil {
-        panic(err)
+        log.Panic(err)
     }
 
-    setUI()
+    displayUI()
     go uiLoop()
 
+    // Exit when press 'Q'
     termui.Handle("/sys/kbd/q", func(termui.Event) {
         termui.StopLoop()
         termui.Clear()
     })
 
+    // Resize window
     termui.Handle("/sys/wnd/resize", func(e termui.Event) {
         termui.Body.Width = termui.TermWidth()
         termui.Body.Align()
@@ -152,6 +207,6 @@ func Gui() {
     })
 
     termui.Loop()
-    termui.Close()
-    os.Exit(0)
+
+    cleanExit()
 }
