@@ -1,4 +1,4 @@
-package parser
+package main
 
 import (
 	"github.com/hpcloud/tail"
@@ -34,8 +34,8 @@ func (s CommonLogStruct) GetSection() string {
 	return "/" + section[0]
 }
 
-// Decode a CommonLog line and return a CommonLogStruct
-func ParseLine(line string) (CommonLogStruct, error) {
+// Decode a ParseCommonLog line and return a CommonLogStruct
+func ParseCommonLog(line string) (CommonLogStruct, error) {
 	logStruct := CommonLogStruct{}
 
 	r := regexp.MustCompile(`^(?P<RemoteHostIP>[\d\.]+) (?P<Identd>.*) (?P<user_id>.*) \[(?P<date>.*)\] "(?P<method>.*) (?P<resource>.*) (?P<protocol>.*)" (?P<Status>\d+) (?P<Size>\d+)`)
@@ -62,9 +62,9 @@ func ParseLine(line string) (CommonLogStruct, error) {
 }
 
 /*
-   Read a Common Log file, parse each line, convert them as a CommonLogStruct, then send it to the channel
+   Read a Common Log file, parse each line, convert them as a CommonLog struct, then send it to the channel
 */
-func Follow(file string) {
+func FollowLog(file string) {
 	t, err := tail.TailFile(file, tail.Config{
 		Follow: true,
 		ReOpen: true,

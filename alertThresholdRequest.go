@@ -1,8 +1,7 @@
-package alert
+package main
 
 import (
     "fmt"
-    "http-monitoring/data"
     "time"
 )
 
@@ -26,18 +25,18 @@ var previousTotalRequests uint64 = 0
    received during its last 2 calls is too high/low
    (send nothing if IsAlertState == false and lastNumberRequests < RequestsThreshold)
 */
-func CheckRequestsThreshold(ms data.MetricStruct) string {
+func CheckRequestsThreshold(ms Metrics) string {
     ms.Mux.Lock()
     defer ms.Mux.Unlock()
     alertMessage := ""
 
-    lastNumberRequests := ms.TotalRequests - previousTotalRequests
+    lastRequests := ms.TotalRequests - previousTotalRequests
 
-    if lastNumberRequests >= RequestsThreshold {
+    if lastRequests >= RequestsThreshold {
         IsAlertState = true
-        alertMessage = fmt.Sprintf(messageTrafficAlert, time.Now().String(), lastNumberRequests, RequestsThreshold)
+        alertMessage = fmt.Sprintf(messageTrafficAlert, time.Now().String(), lastRequests, RequestsThreshold)
 
-    } else if IsAlertState && lastNumberRequests < RequestsThreshold {
+    } else if IsAlertState && lastRequests < RequestsThreshold {
         IsAlertState = false
         alertMessage = fmt.Sprintf(messageTrafficRecovered, time.Now().String())
     }

@@ -1,8 +1,7 @@
-package UI
+package main
 
 import (
 	"github.com/gizak/termui"
-	"http-monitoring/monitoring"
 	"log"
 	"os"
 )
@@ -19,7 +18,7 @@ var (
 // UI Layouts
 var (
 	LastAlert      = termui.NewPar("")
-	Metrics        = termui.NewList()
+	MetricsData        = termui.NewList()
 	Log            = termui.NewList()
 	AlertsHistoric = termui.NewList()
 	Info           = termui.NewPar("Press 'Q' to quit.")
@@ -29,13 +28,12 @@ func display() {
 	LastAlert.Height = 3
 	LastAlert.BorderLabel = "Last Alert"
 
-	Metrics.Height = 6
-	Metrics.BorderLabel = "Metrics"
+	MetricsData.Height = 6
+	MetricsData.BorderLabel = "Metrics"
 
 	Log.Items = Alerts
 	Log.Height = 12
 	Log.BorderLabel = "Log"
-	//Log.BorderFg = termui.ColorYellow
 
 	AlertsHistoric.Height = 7
 	AlertsHistoric.Y = Log.Y + Log.Height
@@ -49,7 +47,7 @@ func display() {
 		termui.NewRow(
 			termui.NewCol(12, 0, LastAlert)),
 		termui.NewRow(
-			termui.NewCol(12, 0, Metrics)),
+			termui.NewCol(12, 0, MetricsData)),
 		termui.NewRow(
 			termui.NewCol(12, 0, Log)),
 		termui.NewRow(
@@ -66,10 +64,10 @@ func EventLoop() {
 	for {
 		select {
 
-		case metrics := <-monitoring.MetricStructToUI_chan:
-			Metrics.Items = metrics.Display()
+		case metrics := <-MetricsToUI_chan:
+			MetricsData.Items = metrics.Display()
 
-		case alertMessage := <-monitoring.TrafficAlertToUI_chan:
+		case alertMessage := <-TrafficAlertToUI_chan:
 			// Update the "LastAlert" ...
 			LastAlert.Text = alertMessage
 
@@ -80,7 +78,7 @@ func EventLoop() {
 			Alerts = append(Alerts, alertMessage)
 			AlertsHistoric.Items = Alerts
 
-		case line := <-monitoring.CommonLogToUI_chan:
+		case line := <-CommonLogToUI_chan:
 			// Append LogLines with the latest line received from the log file
 			if len(LogLines) > 9 {
 				LogLines = LogLines[1:]
@@ -94,12 +92,7 @@ func EventLoop() {
 	}
 }
 
-func cleanExit() {
-	termui.Close()
-	os.Exit(0)
-}
-
-func Start() {
+func RunUI() {
 	err := termui.Init()
 	if err != nil {
 		log.Panic(err)
@@ -122,7 +115,10 @@ func Start() {
 		termui.Render(termui.Body)
 	})
 
+	// Loop until 'Q' is pressed
 	termui.Loop()
 
-	cleanExit()
+	// Exit
+	termui.Close()
+	os.Exit(0)
 }

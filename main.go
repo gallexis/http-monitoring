@@ -1,10 +1,6 @@
 package main
 
 import (
-	"http-monitoring/UI"
-	"http-monitoring/data"
-	"http-monitoring/monitoring"
-	"http-monitoring/parser"
 	"log"
 	"os"
 )
@@ -18,10 +14,10 @@ func main() {
 	defer f.Close()
 	log.SetOutput(f)
 
-	metricsStruct := data.NewMetricStruct()
+	metricsStruct := NewMetricStruct()
 
-	go monitoring.Start(&metricsStruct)
-	go parser.Follow("l.log")
+	go Monitoring(&metricsStruct)
+	go FollowLog("l.log")
 
-	UI.Start()
+    RunUI()
 }

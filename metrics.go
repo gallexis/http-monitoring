@@ -1,8 +1,7 @@
-package data
+package main
 
 import (
     "fmt"
-    "http-monitoring/parser"
     "log"
     "sort"
     "strconv"
@@ -14,7 +13,7 @@ import (
    Structure representing the metrics to be monitored
    Used between many goroutines, so don't forget the mutex (Mux)
 */
-type MetricStruct struct {
+type Metrics struct {
     TotalSize     uint64
     TotalRequests uint64
     URL_sections  map[string]int
@@ -22,49 +21,49 @@ type MetricStruct struct {
     Mux           sync.Mutex
 }
 
-func NewMetricStruct() MetricStruct {
-    return MetricStruct{
+func NewMetricStruct() Metrics {
+    return Metrics{
         URL_sections: make(map[string]int),
         HTTP_status:  make(map[string]int),
     }
 }
 
 // Update the metricStruct with a commonLog struct
-func (d *MetricStruct) Update(logStr parser.CommonLogStruct) {
-    d.Mux.Lock()
-    defer d.Mux.Unlock()
+func (m *Metrics) Update(commonLog CommonLogStruct) {
+    m.Mux.Lock()
+    defer m.Mux.Unlock()
 
-    section := logStr.GetSection()
+    section := commonLog.GetSection()
 
     // URL section counter (i.e : /pages : 4 )
-    d.URL_sections[section] += 1
+    m.URL_sections[section] += 1
 
     // HTTP status counter (i.e : 200, 404, 500...)
-    d.HTTP_status[logStr.Status] += 1
+    m.HTTP_status[commonLog.Status] += 1
 
     // Increase counter of HTTP requests
-    d.TotalRequests += 1
+    m.TotalRequests += 1
 
     // Parse the Size from a String to an Uint64
-    size, err := strconv.ParseUint(logStr.Size, 10, 64)
+    size, err := strconv.ParseUint(commonLog.Size, 10, 64)
     if err != nil {
         log.Panic(err)
     }
-    d.TotalSize += size
+    m.TotalSize += size
 }
 
-func (d MetricStruct) Display() []string {
+func (m Metrics) Display() []string {
     // String Formats
-    totalHTTPRequests := "Total HTTP requests : %d"
-    totalSizeEmitted := "Total Size emitted in bytes : %d"
+    totalHTTPRequests := "Total HTTP requests : %m"
+    totalSizeEmitted := "Total Size emitted in bytes : %m"
     mostViewedSections := "Most viewed sections : %s"
     HTTPstatus := "HTTP Status : %s"
 
     return []string{
-        fmt.Sprintf(totalHTTPRequests, d.TotalRequests),
-        fmt.Sprintf(totalSizeEmitted, d.TotalSize),
-        getHTTPstatus(d.HTTP_status, HTTPstatus),
-        getMostViewedSections(d.URL_sections, mostViewedSections),
+        fmt.Sprintf(totalHTTPRequests, m.TotalRequests),
+        fmt.Sprintf(totalSizeEmitted, m.TotalSize),
+        getHTTPstatus(m.HTTP_status, HTTPstatus),
+        getMostViewedSections(m.URL_sections, mostViewedSections),
     }
 }
 
@@ -96,7 +95,7 @@ func orderMapByValue(m map[string]int) []Pair {
     return array
 }
 
-// getMostViewedSections a string displaying the most viewed sections of the site,
+// getMostViewedSections returns a string displaying the most viewed sections of the site,
 // ordered from the highest to the lower
 func getMostViewedSections(URLsections map[string]int, mostViewedSections string) string {
     var buffer string
@@ -112,7 +111,7 @@ func getMostViewedSections(URLsections map[string]int, mostViewedSections string
     }
 
     // This trims the last white space and returns the buffer
-    // using the MostViewedSections format.
+    // using the mostViewedSections format.
     return fmt.Sprintf(mostViewedSections, strings.TrimRight(buffer, " "))
 }
 
