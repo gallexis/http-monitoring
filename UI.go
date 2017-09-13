@@ -18,7 +18,7 @@ var (
 // UI Layouts
 var (
 	LastAlert      = termui.NewPar("")
-	MetricsData        = termui.NewList()
+	MetricsData    = termui.NewList()
 	Log            = termui.NewList()
 	AlertsHistoric = termui.NewList()
 	Info           = termui.NewPar("Press 'Q' to quit.")

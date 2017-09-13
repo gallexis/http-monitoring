@@ -10,11 +10,11 @@ var CommonLogToUI_chan = make(chan string, 1)
 var MetricsToUI_chan = make(chan Metrics, 1)
 var TrafficAlertToUI_chan = make(chan string, 1)
 
-func Monitoring(metrics *Metrics) {
+func Monitoring(metrics Metrics) {
 
     // Tickers triggered each X seconds
-    metricsToUI_ticker       := time.NewTicker(time.Second * 5).C
-    alertRequestsHTTP_ticker := time.NewTicker(time.Second * 10).C
+    metricsToUI_ticker       := time.NewTicker(time.Second * 10).C
+    alertRequestsHTTP_ticker := time.NewTicker(time.Second * 120).C
 
     for {
         select {
@@ -26,7 +26,7 @@ func Monitoring(metrics *Metrics) {
             CommonLogToUI_chan <- line
 
             // Convert the line to a commonLog struct
-            parsedCommonLog, err := ParseCommonLog(line)
+            parsedCommonLog, err := ParseLine(line)
             if err != nil {
                 log.Panic(err)
             }
@@ -36,11 +36,11 @@ func Monitoring(metrics *Metrics) {
 
             // Send monitoring stats to UI on each tick
         case <-metricsToUI_ticker:
-            MetricsToUI_chan <- *metrics
+            MetricsToUI_chan <- metrics
 
             // Check the number of HTTP requests on each X tick
         case <-alertRequestsHTTP_ticker:
-            alertMessage := CheckRequestsThreshold(*metrics)
+            alertMessage := CheckRequestsThreshold(metrics)
             if alertMessage != "" {
                 TrafficAlertToUI_chan <- alertMessage
             }

@@ -16,7 +16,7 @@ func main() {
 
 	metricsStruct := NewMetricStruct()
 
-	go Monitoring(&metricsStruct)
+	go Monitoring(metricsStruct)
 	go FollowLog("l.log")
 
     RunUI()

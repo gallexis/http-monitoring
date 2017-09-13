@@ -11,7 +11,7 @@ import (
 var CommonLog_chan = make(chan string)
 
 // Structure representing a line of a Common Log file
-type CommonLogStruct struct {
+type CommonLog struct {
 	RemoteHostIP string
 	Identd       string
 	User_id      string
@@ -27,38 +27,38 @@ type CommonLogStruct struct {
    Get the section of a url : section for "http://my.site.com/pages/create' is "http://my.site.com/pages"
    Removes also the arguments in a URL, i.e :  /pages?k=v' -> "/pages"
 */
-func (s CommonLogStruct) GetSection() string {
-	sections := strings.Split(s.Resource, "/")
-	section := strings.Split(sections[1], "?")
+func (cl CommonLog) GetSection() string {
+	sections := strings.Split(cl.Resource, "/")
+	section  := strings.Split(sections[1], "?")
 
 	return "/" + section[0]
 }
 
-// Decode a ParseCommonLog line and return a CommonLogStruct
-func ParseCommonLog(line string) (CommonLogStruct, error) {
-	logStruct := CommonLogStruct{}
+// Decode a CommonLog line and return a CommonLog struct
+func ParseLine(line string) (CommonLog, error) {
+	commonLog := CommonLog{}
 
 	r := regexp.MustCompile(`^(?P<RemoteHostIP>[\d\.]+) (?P<Identd>.*) (?P<user_id>.*) \[(?P<date>.*)\] "(?P<method>.*) (?P<resource>.*) (?P<protocol>.*)" (?P<Status>\d+) (?P<Size>\d+)`)
 	fields := r.FindStringSubmatch(line)
 
-	logStruct.RemoteHostIP = fields[1]
-	logStruct.Identd = fields[2]
-	logStruct.User_id = fields[3]
+	commonLog.RemoteHostIP = fields[1]
+	commonLog.Identd = fields[2]
+	commonLog.User_id = fields[3]
 
 	date, err := time.Parse("02/Jan/2006:15:04:05 -0700", fields[4])
 	if err != nil {
 		log.Println(err)
-		return logStruct, err
+		return commonLog, err
 	}
-	logStruct.Date = date
+	commonLog.Date = date
 
-	logStruct.Method = fields[5]
-	logStruct.Resource = fields[6]
-	logStruct.Protocol = fields[7]
-	logStruct.Status = fields[8]
-	logStruct.Size = fields[9]
+	commonLog.Method = fields[5]
+	commonLog.Resource = fields[6]
+	commonLog.Protocol = fields[7]
+	commonLog.Status = fields[8]
+	commonLog.Size = fields[9]
 
-	return logStruct, nil
+	return commonLog, nil
 }
 
 /*

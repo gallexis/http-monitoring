@@ -7,7 +7,7 @@ import (
 
 // Number max of HTTP requests before raising an alert, between 2 CheckRequestsThreshold() calls
 const (
-    RequestsThreshold uint64 = 25
+    requestsThreshold uint64 = 25
 )
 
 var (
@@ -15,7 +15,7 @@ var (
     messageTrafficRecovered = "[ %s : High traffic recovered](fg-white,bg-green)"
 )
 
-var IsAlertState = false
+var alertState = false
 
 // Used to calculate the number of requests received between 2 CheckRequestsThreshold() calls
 var previousTotalRequests uint64 = 0
@@ -23,24 +23,24 @@ var previousTotalRequests uint64 = 0
 /*
    Function supposed to be called each X seconds, sending alert/recovery messages if number of requests
    received during its last 2 calls is too high/low
-   (send nothing if IsAlertState == false and lastNumberRequests < RequestsThreshold)
 */
-func CheckRequestsThreshold(ms Metrics) string {
-    ms.Mux.Lock()
-    defer ms.Mux.Unlock()
+func CheckRequestsThreshold(metrics Metrics) string {
+    metrics.Mux.Lock()
+    defer metrics.Mux.Unlock()
     alertMessage := ""
 
-    lastRequests := ms.TotalRequests - previousTotalRequests
+    // get the number of the new requests between the last call
+    lastRequests := metrics.Requests - previousTotalRequests
 
-    if lastRequests >= RequestsThreshold {
-        IsAlertState = true
-        alertMessage = fmt.Sprintf(messageTrafficAlert, time.Now().String(), lastRequests, RequestsThreshold)
+    if lastRequests >= requestsThreshold {
+        alertState = true
+        alertMessage = fmt.Sprintf(messageTrafficAlert, time.Now().String(), lastRequests, requestsThreshold)
 
-    } else if IsAlertState && lastRequests < RequestsThreshold {
-        IsAlertState = false
+    } else if alertState && lastRequests < requestsThreshold {
+        alertState = false
         alertMessage = fmt.Sprintf(messageTrafficRecovered, time.Now().String())
     }
 
-    previousTotalRequests = ms.TotalRequests
+    previousTotalRequests = metrics.Requests
     return alertMessage
 }

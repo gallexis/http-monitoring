@@ -14,11 +14,11 @@ import (
    Used between many goroutines, so don't forget the mutex (Mux)
 */
 type Metrics struct {
-    TotalSize     uint64
-    TotalRequests uint64
-    URL_sections  map[string]int
-    HTTP_status   map[string]int
-    Mux           sync.Mutex
+    TotalSize    uint64
+    Requests     uint64
+    URL_sections map[string]int
+    HTTP_status  map[string]int
+    Mux          sync.Mutex
 }
 
 func NewMetricStruct() Metrics {
@@ -28,8 +28,8 @@ func NewMetricStruct() Metrics {
     }
 }
 
-// Update the metricStruct with a commonLog struct
-func (m *Metrics) Update(commonLog CommonLogStruct) {
+// Update the metrics struct from a commonLog struct
+func (m *Metrics) Update(commonLog CommonLog) {
     m.Mux.Lock()
     defer m.Mux.Unlock()
 
@@ -42,9 +42,9 @@ func (m *Metrics) Update(commonLog CommonLogStruct) {
     m.HTTP_status[commonLog.Status] += 1
 
     // Increase counter of HTTP requests
-    m.TotalRequests += 1
+    m.Requests += 1
 
-    // Parse the Size from a String to an Uint64
+    // Parse the Size from a String to an uint64
     size, err := strconv.ParseUint(commonLog.Size, 10, 64)
     if err != nil {
         log.Panic(err)
@@ -54,13 +54,13 @@ func (m *Metrics) Update(commonLog CommonLogStruct) {
 
 func (m Metrics) Display() []string {
     // String Formats
-    totalHTTPRequests := "Total HTTP requests : %m"
-    totalSizeEmitted := "Total Size emitted in bytes : %m"
+    totalHTTPRequests := "Total HTTP requests : %d"
+    totalSizeEmitted := "Total Size emitted in bytes : %d"
     mostViewedSections := "Most viewed sections : %s"
     HTTPstatus := "HTTP Status : %s"
 
     return []string{
-        fmt.Sprintf(totalHTTPRequests, m.TotalRequests),
+        fmt.Sprintf(totalHTTPRequests, m.Requests),
         fmt.Sprintf(totalSizeEmitted, m.TotalSize),
         getHTTPstatus(m.HTTP_status, HTTPstatus),
         getMostViewedSections(m.URL_sections, mostViewedSections),
@@ -76,7 +76,7 @@ type Pair struct {
     Value int
 }
 
-// orderMapByValue will return a new []Pair slice sorted by Value
+// orderMapByValue will return a new []Pair slice sorted by descending order of Value
 func orderMapByValue(m map[string]int) []Pair {
     /*
        When ordering the map, we first put each of its key/value in a Pair structure.
