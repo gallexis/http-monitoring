@@ -1,26 +1,27 @@
 package main
 
 import (
-    "http-monitoring/monitoring"
-    "http-monitoring/gui"
-    "http-monitoring/alerts"
-    "os"
-    "log"
+	"http-monitoring/UI"
+	"http-monitoring/data"
+	"http-monitoring/monitoring"
+	"http-monitoring/parser"
+	"log"
+	"os"
 )
 
 func main() {
+	// Set log options
+	f, err := os.OpenFile("errors.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	if err != nil {
+		panic("Error opening file : " + err.Error())
+	}
+	defer f.Close()
+	log.SetOutput(f)
 
-    // Setting log options
-    f, err := os.OpenFile("errors.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-    if err != nil {
-        panic("Error opening file : " + err.Error())
-    }
-    defer f.Close()
-    log.SetOutput(f)
+	metricsStruct := data.NewMetricStruct()
 
-    go gui.Gui()
-    go monitoring.Monitor(10, monitoring.SendMonitoringDataToUI)
-    go monitoring.Monitor(120, alerts.AlertThresholdHTTP)
+	go monitoring.Start(&metricsStruct)
+	go parser.Follow("l.log")
 
-    monitoring.FollowLogFile("l.log", monitoring.UpdateMonitoringDataStruct)
+	UI.Start()
 }
