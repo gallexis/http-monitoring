@@ -15,10 +15,10 @@ var (
     messageTrafficRecovered = "[ %s : High traffic recovered](fg-white,bg-green)"
 )
 
-var alertState = false
+var trafficAlert = false
 
 // Used to calculate the number of requests received between 2 CheckRequestsThreshold() calls
-var previousTotalRequests uint64 = 0
+var previousRequests uint64 = 0
 
 /*
    Function supposed to be called each X seconds, sending alert/recovery messages if number of requests
@@ -29,18 +29,18 @@ func CheckRequestsThreshold(metrics Metrics) string {
     defer metrics.Mux.Unlock()
     alertMessage := ""
 
-    // get the number of the new requests between the last call
-    lastRequests := metrics.Requests - previousTotalRequests
+    // get the number of the requests received between the last check (delta = total - previous)
+    deltaRequests := metrics.Requests - previousRequests
 
-    if lastRequests >= requestsThreshold {
-        alertState = true
-        alertMessage = fmt.Sprintf(messageTrafficAlert, time.Now().String(), lastRequests, requestsThreshold)
+    if deltaRequests >= requestsThreshold {
+        trafficAlert = true
+        alertMessage = fmt.Sprintf(messageTrafficAlert, time.Now().String(), deltaRequests, requestsThreshold)
 
-    } else if alertState && lastRequests < requestsThreshold {
-        alertState = false
+    } else if trafficAlert && deltaRequests < requestsThreshold {
+        trafficAlert = false
         alertMessage = fmt.Sprintf(messageTrafficRecovered, time.Now().String())
     }
 
-    previousTotalRequests = metrics.Requests
+    previousRequests = metrics.Requests
     return alertMessage
 }

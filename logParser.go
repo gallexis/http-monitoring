@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-var CommonLog_chan = make(chan string)
+var CommonLogChan = make(chan string)
 
 // Structure representing a line of a Common Log file
 type CommonLog struct {
@@ -61,9 +61,7 @@ func ParseLine(line string) (CommonLog, error) {
 	return commonLog, nil
 }
 
-/*
-   Read a Common Log file, parse each line, convert them as a CommonLog struct, then send it to the channel
-*/
+//Read a CommonLog file, parse each line, convert it as a CommonLog struct, then send it to the channel
 func FollowLog(file string) {
 	t, err := tail.TailFile(file, tail.Config{
 		Follow: true,
@@ -75,6 +73,6 @@ func FollowLog(file string) {
 	}
 
 	for line := range t.Lines {
-		CommonLog_chan <- line.Text
+		CommonLogChan <- line.Text
 	}
 }

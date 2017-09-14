@@ -6,43 +6,44 @@ import (
 )
 
 // Channels
-var CommonLogToUI_chan = make(chan string, 1)
-var MetricsToUI_chan = make(chan Metrics, 1)
-var TrafficAlertToUI_chan = make(chan string, 1)
+var CommonLogToUIChan = make(chan string, 1)
+var MetricsToUIChan = make(chan Metrics, 1)
+var TrafficAlertToUIChan = make(chan string, 1)
+
 
 func Monitoring(metrics Metrics) {
 
     // Tickers triggered each X seconds
-    metricsToUI_ticker       := time.NewTicker(time.Second * 10).C
-    alertRequestsHTTP_ticker := time.NewTicker(time.Second * 120).C
+    tickerMetricsChan := time.NewTicker(time.Second * 10).C
+    tickerAlertRequestsChan := time.NewTicker(time.Second * 120).C
 
     for {
         select {
 
             // Receive new line from the log file
-        case line := <-CommonLog_chan:
+        case line := <-CommonLogChan:
 
             // Send this line to the UI
-            CommonLogToUI_chan <- line
+            CommonLogToUIChan <- line
 
             // Convert the line to a commonLog struct
-            parsedCommonLog, err := ParseLine(line)
+            commonLog, err := ParseLine(line)
             if err != nil {
                 log.Panic(err)
             }
 
             // Update the metrics with the new data from a commonLog struct
-            metrics.Update(parsedCommonLog)
+            metrics.Update(commonLog)
 
             // Send monitoring stats to UI on each tick
-        case <-metricsToUI_ticker:
-            MetricsToUI_chan <- metrics
+        case <-tickerMetricsChan:
+            MetricsToUIChan <- metrics
 
             // Check the number of HTTP requests on each X tick
-        case <-alertRequestsHTTP_ticker:
+        case <-tickerAlertRequestsChan:
             alertMessage := CheckRequestsThreshold(metrics)
             if alertMessage != "" {
-                TrafficAlertToUI_chan <- alertMessage
+                TrafficAlertToUIChan <- alertMessage
             }
 
         }

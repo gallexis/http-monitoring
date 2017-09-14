@@ -7,8 +7,8 @@ import (
 )
 
 /*
-   Arrays of strings used to display the contents of the alert messages and the lines received
-   from the log file
+   Arrays of strings used to display the contents of the alert messages,
+   and the lines received from the log file
 */
 var (
 	Alerts   = []string{}
@@ -64,10 +64,10 @@ func EventLoop() {
 	for {
 		select {
 
-		case metrics := <-MetricsToUI_chan:
+		case metrics := <-MetricsToUIChan:
 			MetricsData.Items = metrics.Display()
 
-		case alertMessage := <-TrafficAlertToUI_chan:
+		case alertMessage := <-TrafficAlertToUIChan:
 			// Update the "LastAlert" ...
 			LastAlert.Text = alertMessage
 
@@ -78,7 +78,7 @@ func EventLoop() {
 			Alerts = append(Alerts, alertMessage)
 			AlertsHistoric.Items = Alerts
 
-		case line := <-CommonLogToUI_chan:
+		case line := <-CommonLogToUIChan:
 			// Append LogLines with the latest line received from the log file
 			if len(LogLines) > 9 {
 				LogLines = LogLines[1:]

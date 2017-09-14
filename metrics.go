@@ -11,7 +11,7 @@ import (
 
 /*
    Structure representing the metrics to be monitored
-   Used between many goroutines, so don't forget the mutex (Mux)
+   Used between many goroutines so don't forget the mutex (Mux)
 */
 type Metrics struct {
     TotalSize    uint64
@@ -67,8 +67,13 @@ func (m Metrics) Display() []string {
     }
 }
 
+
+
+
+
 /*
-   This part is used for ordering the values of the map[string]int in descending order
+   This part is used for ordering the values of the map[string]int in descending order,
+    and then display the most viewed section and the HTTP status
 */
 
 type Pair struct {
@@ -131,6 +136,6 @@ func getHTTPstatus(HTTPstatus map[string]int, HTTPStatus string) string {
     }
 
     // This trims the last white space and returns the buffer
-    // using the HTTPStatus format.
+    // using the HTTPstatus format.
     return fmt.Sprintf(HTTPStatus, strings.TrimRight(buffer, " "))
 }

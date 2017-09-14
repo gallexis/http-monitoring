@@ -5,6 +5,7 @@ import (
     "time"
 )
 
+// commonLogMock generates a fake commonLog struct
 func commonLogMock() CommonLog {
     cl := CommonLog{}
 
@@ -29,7 +30,7 @@ func commonLogMock() CommonLog {
 func Test_Update(t *testing.T) {
     m := NewMetricStruct()
 
-    // we update 2 times with the same CommonLog
+    // we update 'm' 2 times (with the same CommonLog)
     m.Update(commonLogMock())
     m.Update(commonLogMock())
 
@@ -49,7 +50,7 @@ func Test_Update(t *testing.T) {
     }
 
     if m.TotalSize != 2326 * 2{
-        t.Error("TotalSize should be 2326 * 2")
+        t.Error("TotalSize should be 4652 (2326 * 2)")
         return
     }
 }
