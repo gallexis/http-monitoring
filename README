@@ -1,0 +1,2 @@
+docker build -t  http .
+docker run -t http  -v access.log:/var/log/access.log

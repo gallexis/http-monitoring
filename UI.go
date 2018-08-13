@@ -4,15 +4,23 @@ import (
 	"github.com/gizak/termui"
 	"log"
 	"os"
+    "container/ring"
 )
 
-/*
-   Arrays of strings used to display the contents of the alert messages,
-   and the lines received from the log file
-*/
+func toString(r *ring.Ring) []string{
+    str := []string{""}
+
+    r.Do(func(p interface{}) {
+        if p != nil{
+            str = append(str, p.(string))
+        }
+    })
+    return str
+}
+
 var (
-	Alerts   = []string{}
-	LogLines = []string{}
+	Alerts    = ring.New(2)
+	LogLines  = ring.New(5)
 )
 
 // UI Layouts
@@ -31,7 +39,7 @@ func display() {
 	MetricsData.Height = 6
 	MetricsData.BorderLabel = "Metrics"
 
-	Log.Items = Alerts
+	Log.Items = toString(Alerts)
 	Log.Height = 12
 	Log.BorderLabel = "Log"
 
@@ -61,30 +69,27 @@ func display() {
 
 // Every time we receive something from a channel, we update the UI
 func EventLoop() {
+
 	for {
 		select {
 
-		case metrics := <-MetricsToUIChan:
+		case metrics := <-DisplayMetricsChan:
 			MetricsData.Items = metrics.Display()
 
-		case alertMessage := <-TrafficAlertToUIChan:
+		case alertMessage := <-DisplayTrafficAlertChan:
 			// Update the "LastAlert" ...
 			LastAlert.Text = alertMessage
 
 			// ... and append it to "AlertsHistoric"
-			if len(Alerts) > 4 {
-				Alerts = Alerts[1:]
-			}
-			Alerts = append(Alerts, alertMessage)
-			AlertsHistoric.Items = Alerts
+			Alerts.Value = alertMessage
+			Alerts.Next()
+			AlertsHistoric.Items = toString(Alerts)
 
-		case line := <-CommonLogToUIChan:
+		case line := <-DisplayLogLineChan:
 			// Append LogLines with the latest line received from the log file
-			if len(LogLines) > 9 {
-				LogLines = LogLines[1:]
-			}
-			LogLines = append(LogLines, line)
-			Log.Items = LogLines
+			LogLines.Value = line
+			LogLines.Next()
+			Log.Items = toString(LogLines)
 		}
 
 		// Refresh the UI with the updated data
@@ -95,7 +100,7 @@ func EventLoop() {
 func RunUI() {
 	err := termui.Init()
 	if err != nil {
-		log.Panic(err)
+		log.Panic(err.Error())
 	}
 
 	display()

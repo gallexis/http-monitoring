@@ -11,59 +11,48 @@ import (
 
 /*
    Structure representing the metrics to be monitored
-   Used between many goroutines so don't forget the mutex (Mux)
+   Used between many goroutines so don't forget the mutex
 */
 type Metrics struct {
     TotalSize    uint64
-    Requests     uint64
-    URL_sections map[string]int
-    HTTP_status  map[string]int
+    HttpRequests uint64
+    HttpStatuses map[string]int
+    UrlSections  map[string]int
     Mux          sync.Mutex
 }
 
-func NewMetricStruct() Metrics {
+func NewMetrics() Metrics {
     return Metrics{
-        URL_sections: make(map[string]int),
-        HTTP_status:  make(map[string]int),
+        UrlSections:  make(map[string]int),
+        HttpStatuses: make(map[string]int),
     }
 }
 
-// Update the metrics struct from a commonLog struct
-func (m *Metrics) Update(commonLog CommonLog) {
+// Update the metric structs from a LogLine struct
+func (m *Metrics) Update(logLine LogLine) {
     m.Mux.Lock()
     defer m.Mux.Unlock()
 
-    section := commonLog.GetSection()
+    section := logLine.GetSection()
 
-    // URL section counter (i.e : /pages : 4 )
-    m.URL_sections[section] += 1
+    m.UrlSections[section] += 1
+    m.HttpStatuses[logLine.Status] += 1
+    m.HttpRequests += 1
 
-    // HTTP status counter (i.e : 200, 404, 500...)
-    m.HTTP_status[commonLog.Status] += 1
-
-    // Increase counter of HTTP requests
-    m.Requests += 1
-
-    // Parse the Size from a String to an uint64
-    size, err := strconv.ParseUint(commonLog.Size, 10, 64)
+    // Parse a size in String to uint64
+    size, err := strconv.ParseUint(logLine.Size, 10, 64)
     if err != nil {
-        log.Panic(err)
+        log.Println(err.Error())
     }
     m.TotalSize += size
 }
 
 func (m Metrics) Display() []string {
-    // String Formats
-    totalHTTPRequests := "Total HTTP requests : %d"
-    totalSizeEmitted := "Total Size emitted in bytes : %d"
-    mostViewedSections := "Most viewed sections : %s"
-    HTTPstatus := "HTTP Status : %s"
-
     return []string{
-        fmt.Sprintf(totalHTTPRequests, m.Requests),
-        fmt.Sprintf(totalSizeEmitted, m.TotalSize),
-        getHTTPstatus(m.HTTP_status, HTTPstatus),
-        getMostViewedSections(m.URL_sections, mostViewedSections),
+        fmt.Sprintf("Total HTTP requests : %d", m.HttpRequests),
+        fmt.Sprintf("Total Size emitted in bytes : %d", m.TotalSize),
+        getHTTPstatus(m.HttpStatuses, "HTTP Status : %s", 5),
+        getMostViewedSections(m.UrlSections, "Most viewed sections : %s", 3),
     }
 }
 
@@ -81,10 +70,10 @@ type Pair struct {
     Value int
 }
 
-// orderMapByValue will return a new []Pair slice sorted by descending order of Value
-func orderMapByValue(m map[string]int) []Pair {
+// sortMap will return a new []Pair slice sorted by descending order of Value
+func sortMap(m map[string]int) []Pair {
     /*
-       When ordering the map, we first put each of its key/value in a Pair structure.
+       When sorting the map, we first put each of its key/value in a Pair structure.
        Each of these Pair structures will be put in an array, then sorted by Value
     */
     var array []Pair
@@ -102,12 +91,12 @@ func orderMapByValue(m map[string]int) []Pair {
 
 // getMostViewedSections returns a string displaying the most viewed sections of the site,
 // ordered from the highest to the lower
-func getMostViewedSections(URLsections map[string]int, mostViewedSections string) string {
+func getMostViewedSections(URLsections map[string]int, mostViewedSections string, limit int) string {
     var buffer string
-    orderedArray := orderMapByValue(URLsections)
+    orderedArray := sortMap(URLsections)
 
     for i, kv := range orderedArray {
-        if i > 2 {
+        if i >= limit {
             break
         }
 
@@ -122,12 +111,12 @@ func getMostViewedSections(URLsections map[string]int, mostViewedSections string
 
 // getHTTPstatus returns a string displaying the HTTP status of the site,
 // ordered from the highest to the lower
-func getHTTPstatus(HTTPstatus map[string]int, HTTPStatus string) string {
+func getHTTPstatus(HTTPstatus map[string]int, HTTPStatus string, limit int) string {
     var buffer string
-    orderedArray := orderMapByValue(HTTPstatus)
+    orderedArray := sortMap(HTTPstatus)
 
     for i, kv := range orderedArray {
-        if i > 4 {
+        if i >= limit {
             break
         }
 

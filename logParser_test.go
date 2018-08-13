@@ -7,7 +7,7 @@ import (
 
 func Test_GetSection(t *testing.T) {
 
-    s := CommonLog{Resource: "/pages/foo/bar?k=v"}
+    s := LogLine{Resource: "/pages/foo/bar?k=v"}
     if s.GetSection() != "/pages"{
         t.Error("Error in GetSection().")
         return
@@ -33,7 +33,7 @@ func Test_ParseCommonLog(t *testing.T) {
 
     if  commonLog.RemoteHostIP != "127.0.0.1" ||
         commonLog.Identd != "user-identifier" ||
-        commonLog.User_id != "frank" ||
+        commonLog.UserID != "frank" ||
         commonLog.Date.String() != date.String() ||
         commonLog.Method != "GET" ||
         commonLog.Resource != "/apache_pb.gif" ||

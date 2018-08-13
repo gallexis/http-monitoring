@@ -3,47 +3,57 @@ package main
 import (
     "log"
     "time"
+    "github.com/hpcloud/tail"
 )
 
-// Channels
-var CommonLogToUIChan = make(chan string, 1)
-var MetricsToUIChan = make(chan Metrics, 1)
-var TrafficAlertToUIChan = make(chan string, 1)
+// UI Channels
+var DisplayLogLineChan = make(chan string, 1)
+var DisplayMetricsChan = make(chan Metrics, 1)
+var DisplayTrafficAlertChan = make(chan string, 1)
 
 
-func Monitoring(metrics Metrics) {
+//Read a log file, parse each line then send them to the LogLine channel
+func StartLogFileFollower(commonLogFile *tail.Tail) {
+    for line := range commonLogFile.Lines {
+        println(line.Text)
+        LogLineChan <- line.Text
+    }
+}
+
+
+func StartMonitoring(metrics Metrics) {
 
     // Tickers triggered each X seconds
-    tickerMetricsChan := time.NewTicker(time.Second * 10).C
-    tickerAlertRequestsChan := time.NewTicker(time.Second * 120).C
+    tickerMetrics := time.NewTicker(time.Second * 2).C
+    tickerAlertRequests := time.NewTicker(time.Second * 4).C
 
     for {
         select {
 
             // Receive new line from the log file
-        case line := <-CommonLogChan:
+        case line := <-LogLineChan:
 
-            // Send this line to the UI
-            CommonLogToUIChan <- line
+            // Send this raw string line to the UI
+            DisplayLogLineChan <- line
 
-            // Convert the line to a commonLog struct
-            commonLog, err := ParseLine(line)
+            // Convert the line to a LogLine struct
+            logLine, err := ParseLine(line)
             if err != nil {
-                log.Panic(err)
+                log.Println(err.Error())
             }
 
-            // Update the metrics with the new data from a commonLog struct
-            metrics.Update(commonLog)
+            // Update the metrics with the new data from a logLine struct
+            metrics.Update(logLine)
 
             // Send monitoring stats to UI on each tick
-        case <-tickerMetricsChan:
-            MetricsToUIChan <- metrics
+        case <-tickerMetrics:
+            DisplayMetricsChan <- metrics
 
             // Check the number of HTTP requests on each X tick
-        case <-tickerAlertRequestsChan:
+        case <-tickerAlertRequests:
             alertMessage := CheckRequestsThreshold(metrics)
             if alertMessage != "" {
-                TrafficAlertToUIChan <- alertMessage
+                DisplayTrafficAlertChan <- alertMessage
             }
 
         }
