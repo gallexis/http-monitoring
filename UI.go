@@ -1,129 +1,115 @@
 package main
 
 import (
-	"github.com/gizak/termui"
-	"log"
-	"os"
-    "container/ring"
+    "github.com/gizak/termui"
+    "log"
+    "os"
 )
 
-func toString(r *ring.Ring) []string{
-    str := []string{""}
-
-    r.Do(func(p interface{}) {
-        if p != nil{
-            str = append(str, p.(string))
-        }
-    })
-    return str
+type UiLayouts struct {
+    LastAlert     *termui.Par
+    MetricsData   *termui.List
+    Log           *termui.List
+    AlertsHistory *termui.List
+    Info          *termui.Par
 }
 
-var (
-	Alerts    = ring.New(2)
-	LogLines  = ring.New(5)
-)
+func NewUiLayout() UiLayouts {
+    return UiLayouts{
+        LastAlert:     termui.NewPar(""),
+        MetricsData:   termui.NewList(),
+        Log:           termui.NewList(),
+        AlertsHistory: termui.NewList(),
+        Info:          termui.NewPar("Press 'Q' to quit."),
+    }
+}
 
-// UI Layouts
-var (
-	LastAlert      = termui.NewPar("")
-	MetricsData    = termui.NewList()
-	Log            = termui.NewList()
-	AlertsHistoric = termui.NewList()
-	Info           = termui.NewPar("Press 'Q' to quit.")
-)
+func (ui UiLayouts) display() {
+    ui.LastAlert.Height = 3
+    ui.LastAlert.BorderLabel = "Last Alert"
 
-func display() {
-	LastAlert.Height = 3
-	LastAlert.BorderLabel = "Last Alert"
+    ui.MetricsData.Height = 6
+    ui.MetricsData.BorderLabel = "Metrics"
 
-	MetricsData.Height = 6
-	MetricsData.BorderLabel = "Metrics"
+    ui.Log.Items = []string{} //ringToStringArray(Alerts)
+    ui.Log.Height = 12
+    ui.Log.BorderLabel = "Log"
 
-	Log.Items = toString(Alerts)
-	Log.Height = 12
-	Log.BorderLabel = "Log"
+    ui.AlertsHistory.Height = 7
+    ui.AlertsHistory.Y = ui.Log.Y + ui.Log.Height
+    ui.AlertsHistory.BorderLabel = "Alerts Historic"
 
-	AlertsHistoric.Height = 7
-	AlertsHistoric.Y = Log.Y + Log.Height
-	AlertsHistoric.BorderLabel = "Alerts Historic"
+    ui.Info.Height = 3
+    ui.Info.BorderLabel = "Info."
+    ui.Info.BorderFg = termui.ColorCyan
 
-	Info.Height = 3
-	Info.BorderLabel = "Info."
-	Info.BorderFg = termui.ColorCyan
+    termui.Body.AddRows(
+        termui.NewRow(
+            termui.NewCol(12, 0, ui.LastAlert)),
+        termui.NewRow(
+            termui.NewCol(12, 0, ui.MetricsData)),
+        termui.NewRow(
+            termui.NewCol(12, 0, ui.Log)),
+        termui.NewRow(
+            termui.NewCol(12, 0, ui.AlertsHistory)),
+        termui.NewRow(
+            termui.NewCol(12, 0, ui.Info)))
 
-	termui.Body.AddRows(
-		termui.NewRow(
-			termui.NewCol(12, 0, LastAlert)),
-		termui.NewRow(
-			termui.NewCol(12, 0, MetricsData)),
-		termui.NewRow(
-			termui.NewCol(12, 0, Log)),
-		termui.NewRow(
-			termui.NewCol(12, 0, AlertsHistoric)),
-		termui.NewRow(
-			termui.NewCol(12, 0, Info)))
-
-	// calculate layout
-	termui.Body.Align()
+    // calculate layout
+    termui.Body.Align()
 }
 
 // Every time we receive something from a channel, we update the UI
-func EventLoop() {
+func (ui UiLayouts) EventLoop() {
+    for {
+        select {
 
-	for {
-		select {
+        case metrics := <-DisplayMetricsChan:
+            ui.MetricsData.Items = metrics.Display()
 
-		case metrics := <-DisplayMetricsChan:
-			MetricsData.Items = metrics.Display()
+        case metrics := <-DisplayTrafficAlertChan:
+            ui.LastAlert.Text = metrics.LastAlertMessage                       // Update the "LastAlert" ...
+            ui.AlertsHistory.Items = metrics.ringToStringArray(metrics.Alerts) // ... and append it to "AlertsHistory"
 
-		case alertMessage := <-DisplayTrafficAlertChan:
-			// Update the "LastAlert" ...
-			LastAlert.Text = alertMessage
+        case metrics := <-DisplayLogLineChan:
+            // Append LogLines with the latest line received from the log file
+            ui.Log.Items = metrics.ringToStringArray(metrics.LogLines)
+        }
 
-			// ... and append it to "AlertsHistoric"
-			Alerts.Value = alertMessage
-			Alerts.Next()
-			AlertsHistoric.Items = toString(Alerts)
-
-		case line := <-DisplayLogLineChan:
-			// Append LogLines with the latest line received from the log file
-			LogLines.Value = line
-			LogLines.Next()
-			Log.Items = toString(LogLines)
-		}
-
-		// Refresh the UI with the updated data
-		termui.Render(termui.Body)
-	}
+        // Refresh the UI with the updated data
+        termui.Render(termui.Body)
+    }
 }
 
 func RunUI() {
-	err := termui.Init()
-	if err != nil {
-		log.Panic(err.Error())
-	}
+    err := termui.Init()
+    if err != nil {
+        log.Panic(err.Error())
+    }
 
-	display()
-	go EventLoop()
+    ui := NewUiLayout()
 
-	// Exit when press 'Q'
-	termui.Handle("/sys/kbd/q", func(termui.Event) {
-		termui.StopLoop()
-		termui.Clear()
-	})
+    ui.display()
+    go ui.EventLoop()
 
-	// Resize window
-	termui.Handle("/sys/wnd/resize", func(e termui.Event) {
-		termui.Body.Width = termui.TermWidth()
-		termui.Body.Align()
-		termui.Clear()
-		termui.Render(termui.Body)
-	})
+    // Exit when press 'Q'
+    termui.Handle("/sys/kbd/q", func(termui.Event) {
+        termui.StopLoop()
+        termui.Clear()
+    })
 
-	// Loop until 'Q' is pressed
-	termui.Loop()
+    // Resize window
+    termui.Handle("/sys/wnd/resize", func(e termui.Event) {
+        termui.Body.Width = termui.TermWidth()
+        termui.Body.Align()
+        termui.Clear()
+        termui.Render(termui.Body)
+    })
 
-	// Exit
-	termui.Close()
-	os.Exit(0)
+    // Loop until 'Q' is pressed
+    termui.Loop()
+
+    // Exit
+    termui.Close()
+    os.Exit(0)
 }

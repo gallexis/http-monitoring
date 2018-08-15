@@ -7,6 +7,7 @@ import (
     "strconv"
     "strings"
     "sync"
+    "container/ring"
 )
 
 /*
@@ -14,18 +15,39 @@ import (
    Used between many goroutines so don't forget the mutex
 */
 type Metrics struct {
-    TotalSize    uint64
-    HttpRequests uint64
-    HttpStatuses map[string]int
-    UrlSections  map[string]int
-    Mux          sync.Mutex
+    SizeHttpRequests      uint64
+    HttpRequests          uint64
+    HttpStatuses          map[string]int
+    UrlSections           map[string]int
+    Mux                   sync.Mutex
+    Alerts                *ring.Ring
+    LogLines              *ring.Ring
+    IsTrafficAlert        bool
+    LastAlertMessage      string
+    PreviousTotalRequests uint64
+    RequestsThreshold     uint64
 }
 
 func NewMetrics() Metrics {
     return Metrics{
-        UrlSections:  make(map[string]int),
-        HttpStatuses: make(map[string]int),
+        UrlSections:       make(map[string]int),
+        HttpStatuses:      make(map[string]int),
+        Alerts:            ring.New(5),
+        LogLines:          ring.New(10),
+        IsTrafficAlert:    false,
+        RequestsThreshold: 25,
     }
+}
+
+func (m *Metrics) ringToStringArray(r *ring.Ring) []string {
+    var str []string
+
+    r.Do(func(p interface{}) {
+        if p != nil {
+            str = append(str, p.(string))
+        }
+    })
+    return str
 }
 
 // Update the metric structs from a LogLine struct
@@ -44,21 +66,17 @@ func (m *Metrics) Update(logLine LogLine) {
     if err != nil {
         log.Println(err.Error())
     }
-    m.TotalSize += size
+    m.SizeHttpRequests += size
 }
 
 func (m Metrics) Display() []string {
     return []string{
         fmt.Sprintf("Total HTTP requests : %d", m.HttpRequests),
-        fmt.Sprintf("Total Size emitted in bytes : %d", m.TotalSize),
+        fmt.Sprintf("Total Size emitted in bytes : %d", m.SizeHttpRequests),
         getHTTPstatus(m.HttpStatuses, "HTTP Status : %s", 5),
         getMostViewedSections(m.UrlSections, "Most viewed sections : %s", 3),
     }
 }
-
-
-
-
 
 /*
    This part is used for ordering the values of the map[string]int in descending order,

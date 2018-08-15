@@ -7,21 +7,20 @@ import (
 )
 
 // UI Channels
-var DisplayLogLineChan = make(chan string, 1)
+var DisplayLogLineChan = make(chan Metrics, 1)
 var DisplayMetricsChan = make(chan Metrics, 1)
-var DisplayTrafficAlertChan = make(chan string, 1)
+var DisplayTrafficAlertChan = make(chan Metrics, 1)
 
 
 //Read a log file, parse each line then send them to the LogLine channel
 func StartLogFileFollower(commonLogFile *tail.Tail) {
     for line := range commonLogFile.Lines {
-        println(line.Text)
         LogLineChan <- line.Text
     }
 }
 
 
-func StartMonitoring(metrics Metrics) {
+func (metrics *Metrics) StartMonitoring() {
 
     // Tickers triggered each X seconds
     tickerMetrics := time.NewTicker(time.Second * 2).C
@@ -32,9 +31,9 @@ func StartMonitoring(metrics Metrics) {
 
             // Receive new line from the log file
         case line := <-LogLineChan:
-
             // Send this raw string line to the UI
-            DisplayLogLineChan <- line
+            metrics.LogLines.Value = line
+            metrics.LogLines = metrics.LogLines.Next()
 
             // Convert the line to a LogLine struct
             logLine, err := ParseLine(line)
@@ -45,18 +44,22 @@ func StartMonitoring(metrics Metrics) {
             // Update the metrics with the new data from a logLine struct
             metrics.Update(logLine)
 
+            DisplayLogLineChan <- *metrics
+
             // Send monitoring stats to UI on each tick
         case <-tickerMetrics:
-            DisplayMetricsChan <- metrics
+            DisplayMetricsChan <- *metrics
 
             // Check the number of HTTP requests on each X tick
         case <-tickerAlertRequests:
-            alertMessage := CheckRequestsThreshold(metrics)
-            if alertMessage != "" {
-                DisplayTrafficAlertChan <- alertMessage
+            metrics.CheckRequestsThreshold()
+
+            if metrics.LastAlertMessage != "" {
+                metrics.Alerts.Value = metrics.LastAlertMessage
+                metrics.Alerts = metrics.Alerts.Next()
+                DisplayTrafficAlertChan <- *metrics
             }
 
         }
     }
-
 }

@@ -50,8 +50,8 @@ func Test_Update(t *testing.T) {
         return
     }
 
-    if m.TotalSize != 2326 * 2{
-        t.Error("TotalSize should be 4652 (2326 * 2)")
+    if m.SizeHttpRequests != 2326 * 2{
+        t.Error("SizeHttpRequests should be 4652 (2326 * 2)")
         return
     }
 }
