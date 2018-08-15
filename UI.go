@@ -3,24 +3,23 @@ package main
 import (
     "github.com/gizak/termui"
     "log"
-    "os"
 )
 
 type UiLayouts struct {
-    LastAlert     *termui.Par
-    MetricsData   *termui.List
-    Log           *termui.List
-    AlertsHistory *termui.List
-    Info          *termui.Par
+    LastAlert      *termui.Par
+    MonitoringData *termui.List
+    Log            *termui.List
+    AlertsHistory  *termui.List
+    Info           *termui.Par
 }
 
 func NewUiLayout() UiLayouts {
     return UiLayouts{
-        LastAlert:     termui.NewPar(""),
-        MetricsData:   termui.NewList(),
-        Log:           termui.NewList(),
-        AlertsHistory: termui.NewList(),
-        Info:          termui.NewPar("Press 'Q' to quit."),
+        LastAlert:      termui.NewPar(""),
+        MonitoringData: termui.NewList(),
+        Log:            termui.NewList(),
+        AlertsHistory:  termui.NewList(),
+        Info:           termui.NewPar("Press 'Q' to quit."),
     }
 }
 
@@ -28,10 +27,10 @@ func (ui UiLayouts) display() {
     ui.LastAlert.Height = 3
     ui.LastAlert.BorderLabel = "Last Alert"
 
-    ui.MetricsData.Height = 6
-    ui.MetricsData.BorderLabel = "Metrics"
+    ui.MonitoringData.Height = 6
+    ui.MonitoringData.BorderLabel = "Monitoring Data"
 
-    ui.Log.Items = []string{} //ringToStringArray(Alerts)
+    ui.Log.Items = []string{}
     ui.Log.Height = 12
     ui.Log.BorderLabel = "Log"
 
@@ -47,7 +46,7 @@ func (ui UiLayouts) display() {
         termui.NewRow(
             termui.NewCol(12, 0, ui.LastAlert)),
         termui.NewRow(
-            termui.NewCol(12, 0, ui.MetricsData)),
+            termui.NewCol(12, 0, ui.MonitoringData)),
         termui.NewRow(
             termui.NewCol(12, 0, ui.Log)),
         termui.NewRow(
@@ -64,15 +63,14 @@ func (ui UiLayouts) EventLoop() {
     for {
         select {
 
-        case metrics := <-DisplayMetricsChan:
-            ui.MetricsData.Items = metrics.Display()
+        case metrics := <-DisplayMonitoringDataChan:
+            ui.MonitoringData.Items = metrics.Display()
 
         case metrics := <-DisplayTrafficAlertChan:
-            ui.LastAlert.Text = metrics.LastAlertMessage                       // Update the "LastAlert" ...
-            ui.AlertsHistory.Items = metrics.ringToStringArray(metrics.Alerts) // ... and append it to "AlertsHistory"
+            ui.LastAlert.Text = metrics.LastAlertMessage
+            ui.AlertsHistory.Items = metrics.ringToStringArray(metrics.Alerts)
 
         case metrics := <-DisplayLogLineChan:
-            // Append LogLines with the latest line received from the log file
             ui.Log.Items = metrics.ringToStringArray(metrics.LogLines)
         }
 
@@ -111,5 +109,4 @@ func RunUI() {
 
     // Exit
     termui.Close()
-    os.Exit(0)
 }

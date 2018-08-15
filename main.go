@@ -34,11 +34,10 @@ func init() {
 func main() {
 	defer errorsLogFile.Close()
 	log.SetOutput(errorsLogFile)
-	m := NewMetrics()
+	m := NewMonitoringData()
 
 	go m.StartMonitoring()
 	go StartLogFileFollower(commonLogFile)
 
 	RunUI()
-
 }

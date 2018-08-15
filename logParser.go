@@ -21,7 +21,6 @@ type LogLine struct {
 }
 
 /*
-    TODO: Use a lib
    Get the section of a url : section for "http://my.site.com/pages/create' is "http://my.site.com/pages"
    Removes also the arguments in a URL, i.e :  /pages?k=v' -> "/pages"
 */
@@ -51,7 +50,6 @@ func ParseLine(line string) (LogLine, error) {
     date, err := time.Parse("02/Jan/2006:15:04:05 -0700", fields[4])
     if err != nil {
         log.Println(err.Error())
-        return logLine, err
     }
     logLine.Date = date
 

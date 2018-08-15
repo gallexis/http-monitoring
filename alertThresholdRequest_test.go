@@ -4,29 +4,31 @@ import (
     "testing"
 )
 
-func Test_AlertThresholdHTTP(t *testing.T) {
-    metrics := NewMetrics()
+var requestsThreshold = uint64(25)
 
-    // Set the number of HttpRequests at the threshold limit to trigger an alert
-    metrics.HttpRequests = requestsThreshold
-    alertMessage := CheckRequestsThreshold(metrics)
-    if !isTrafficAlert || alertMessage == ""{
+func Test_AlertThresholdHTTP(t *testing.T) {
+    md := NewMonitoringData()
+
+    // Set the number of HttpRequestsCount at the threshold limit to trigger an alert
+    md.HttpRequestsCount = requestsThreshold
+    md.CheckHttpThresholdCrossed()
+    if !md.IsTrafficAlert || md.LastAlertMessage == ""{
         t.Error("Exception raised, should have received a traffic alert.")
         return
     }
 
     // Set the number of requests under the threshold limit to trigger a recovery alert
-    previousTotalRequests = metrics.HttpRequests
-    metrics.HttpRequests += requestsThreshold - 1
-    alertMessage = CheckRequestsThreshold(metrics)
-    if isTrafficAlert || alertMessage == ""{
+    md.PreviousTotalRequests = md.HttpRequestsCount
+    md.HttpRequestsCount += requestsThreshold - 1
+    md.CheckHttpThresholdCrossed()
+    if md.IsTrafficAlert || md.LastAlertMessage == ""{
         t.Error("Exception raised, should have received a traffic recover.")
         return
     }
 
     // Still under the threshold limit : alertMessage must be empty, and no alert must be triggered
-    alertMessage = CheckRequestsThreshold(metrics)
-    if isTrafficAlert || alertMessage != ""{
+    md.CheckHttpThresholdCrossed()
+    if md.IsTrafficAlert || md.LastAlertMessage != ""{
         t.Error("Exception raised, IsAlertState must be at false.")
         return
     }

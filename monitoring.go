@@ -7,10 +7,9 @@ import (
 )
 
 // UI Channels
-var DisplayLogLineChan = make(chan Metrics, 1)
-var DisplayMetricsChan = make(chan Metrics, 1)
-var DisplayTrafficAlertChan = make(chan Metrics, 1)
-
+var DisplayLogLineChan = make(chan MonitoringData, 1)
+var DisplayMonitoringDataChan = make(chan MonitoringData, 1)
+var DisplayTrafficAlertChan = make(chan MonitoringData, 1)
 
 //Read a log file, parse each line then send them to the LogLine channel
 func StartLogFileFollower(commonLogFile *tail.Tail) {
@@ -19,47 +18,47 @@ func StartLogFileFollower(commonLogFile *tail.Tail) {
     }
 }
 
-
-func (metrics *Metrics) StartMonitoring() {
+func (md *MonitoringData) StartMonitoring() {
 
     // Tickers triggered each X seconds
     tickerMetrics := time.NewTicker(time.Second * 2).C
     tickerAlertRequests := time.NewTicker(time.Second * 4).C
+    DisplayMonitoringDataChan <- *md
 
     for {
         select {
 
-            // Receive new line from the log file
+        // Receive new line from the log file
         case line := <-LogLineChan:
-            // Send this raw string line to the UI
-            metrics.LogLines.Value = line
-            metrics.LogLines = metrics.LogLines.Next()
+            // Add this raw string line to the Ring
+            md.LogLines.Value = line
+            md.LogLines = md.LogLines.Next()
 
-            // Convert the line to a LogLine struct
+            // Then convert it to a LogLine struct
             logLine, err := ParseLine(line)
             if err != nil {
                 log.Println(err.Error())
             }
 
-            // Update the metrics with the new data from a logLine struct
-            metrics.Update(logLine)
+            // Update the monitoring data struct with the new line received ...
+            md.Update(logLine)
 
-            DisplayLogLineChan <- *metrics
+            // ... then send it to the UI
+            DisplayLogLineChan <- *md
 
             // Send monitoring stats to UI on each tick
         case <-tickerMetrics:
-            DisplayMetricsChan <- *metrics
+            DisplayMonitoringDataChan <- *md
 
             // Check the number of HTTP requests on each X tick
         case <-tickerAlertRequests:
-            metrics.CheckRequestsThreshold()
+            md.CheckHttpThresholdCrossed()
 
-            if metrics.LastAlertMessage != "" {
-                metrics.Alerts.Value = metrics.LastAlertMessage
-                metrics.Alerts = metrics.Alerts.Next()
-                DisplayTrafficAlertChan <- *metrics
+            if md.LastAlertMessage != ""{
+                md.Alerts.Value = md.LastAlertMessage
+                md.Alerts = md.Alerts.Next()
+                DisplayTrafficAlertChan <- *md
             }
-
         }
     }
 }
