@@ -5,19 +5,14 @@ import (
     "time"
 )
 
-// Number max of HTTP requests before raising an alert, between 2 CheckHttpThresholdCrossed() calls
-
 var (
     trafficAlertMessage     = "[ %s : High traffic generated an alert - hits = %d, threshold = %d](fg-white,bg-red)"
     TrafficRecoveredMessage = "[ %s : High traffic recovered](fg-white,bg-green)"
 )
 
-// Used to calculate the number of requests received between 2 CheckHttpThresholdCrossed() calls
-// var previousTotalRequests uint64 = 0
-
 /*
    Function supposed to be called each X seconds, sending alert/recovery messages if number of requests
-   received during its last 2 calls is too high/low
+   received during the last 2 calls is too high/low
 */
 func (md *MonitoringData) CheckHttpThresholdCrossed() {
     md.Mux.Lock()

@@ -1,2 +1,27 @@
-docker build -t  http .
-docker run -t http  -v access.log:/var/log/access.log
+I couldn 't use docker because, the termui library i'm using is buggy in docker, and I found out why :
+https://github.com/gizak/termui/issues/116
+
+
+Run the program :
+- go build && ./http-monitoring
+- I'm using https://github.com/kiritbasu/Fake-Apache-Log-Generator to generate the log lines
+
+
+Details :
+- You can change on the main file, the path of the access.log (defaults to "/var/log/access.log")
+- The ParseLine function of the logParser file reads a commonLog file, reads each lines, then send it to a channel.
+- The Monitoring function of the monitoring file receives these lines, send them to the UI, and convert
+  all the data inside these lines to a logLine structure.
+- The MonitoringData structure contains all the data used for the monitoring (total number of http requests,
+  total http size ...)
+- In the Monitoring function, every X seconds we will send the MonitoringData structure to the UI,
+  but we will also check every X' seconds that the HTTP threshold has not been crossed.
+- In the UI file, the EventLoop function will loop infinitely and wait until one of the previous event is triggered,
+  and then display the appropriate info in the console (Refresh of the monitoring number, alerts or recovers)
+
+
+Possible Improvements :
+- Add new alerting logics (alert if too many 404/500 errors...)
+- Better organize the code structure, to be able to add new monitoring parameters and make it more scalable
+  (I judged it wasn't necessary for the sake of readability of the code because we only have 1 alerting logic)
+- Add different log format readers

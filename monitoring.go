@@ -12,17 +12,16 @@ var DisplayMonitoringDataChan = make(chan MonitoringData, 1)
 var DisplayTrafficAlertChan = make(chan MonitoringData, 1)
 
 //Read a log file, parse each line then send them to the LogLine channel
-func StartLogFileFollower(commonLogFile *tail.Tail) {
+func FileFollower(commonLogFile *tail.Tail) {
     for line := range commonLogFile.Lines {
         LogLineChan <- line.Text
     }
 }
 
-func (md *MonitoringData) StartMonitoring() {
-
+func (md *MonitoringData) StartMonitoring(monitoringDataDelay, alertsDelay int) {
     // Tickers triggered each X seconds
-    tickerMetrics := time.NewTicker(time.Second * 2).C
-    tickerAlertRequests := time.NewTicker(time.Second * 4).C
+    tickerMonitoringData := time.NewTicker(time.Second * time.Duration(monitoringDataDelay)).C
+    tickerAlerts := time.NewTicker(time.Second * time.Duration(alertsDelay)).C
     DisplayMonitoringDataChan <- *md
 
     for {
@@ -47,11 +46,11 @@ func (md *MonitoringData) StartMonitoring() {
             DisplayLogLineChan <- *md
 
             // Send monitoring stats to UI on each tick
-        case <-tickerMetrics:
+        case <-tickerMonitoringData:
             DisplayMonitoringDataChan <- *md
 
             // Check the number of HTTP requests on each X tick
-        case <-tickerAlertRequests:
+        case <-tickerAlerts:
             md.CheckHttpThresholdCrossed()
 
             if md.LastAlertMessage != ""{

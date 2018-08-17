@@ -18,7 +18,7 @@ type MonitoringData struct {
     HttpRequestsCount     uint64
     HttpStatuses          map[string]uint64
     UrlSections           map[string]uint64
-    Alerts                *ring.Ring
+    Alerts                *ring.Ring // The ring is just a circular array.
     LogLines              *ring.Ring
     IsTrafficAlert        bool
     LastAlertMessage      string
@@ -27,21 +27,20 @@ type MonitoringData struct {
     Mux                   sync.Mutex
 }
 
-func NewMonitoringData() MonitoringData {
+func NewMonitoringData(requestsThreshold uint64) MonitoringData {
     return MonitoringData{
         UrlSections:       make(map[string]uint64),
         HttpStatuses:      make(map[string]uint64),
-        Alerts:            ring.New(5),
-        LogLines:          ring.New(10),
+        Alerts:            ring.New(5),  // will display the last 5 alerts
+        LogLines:          ring.New(10), // will display the last 10 log lines
         IsTrafficAlert:    false,
-        RequestsThreshold: 25,
+        RequestsThreshold: requestsThreshold,
     }
 }
 
-
 /*
-    The ring is just a circular array.
-    ringToStringArray allows to put all the elements of the ring into an array of string
+    ringToStringArray put all the elements of the ring into an array of string
+    Used to display the last n alerts or n log lines
  */
 func (md *MonitoringData) ringToStringArray(r *ring.Ring) []string {
     var str []string
@@ -54,7 +53,7 @@ func (md *MonitoringData) ringToStringArray(r *ring.Ring) []string {
     return str
 }
 
-// Update the metric structs from a LogLine struct
+// Update the MonitoringData struct given a LogLine struct
 func (md *MonitoringData) Update(logLine LogLine) {
     md.Mux.Lock()
     defer md.Mux.Unlock()
@@ -125,8 +124,7 @@ func getMostViewedSections(URLsections map[string]uint64, mostViewedSections str
         buffer = fmt.Sprintf("%s[%s : %d] ", buffer, kv.Key, kv.Value)
     }
 
-    // This trims the last white space and returns the buffer
-    // using the mostViewedSections format.
+    // Returns the buffer using the mostViewedSections format.
     return fmt.Sprintf(mostViewedSections, buffer)
 }
 
@@ -145,7 +143,6 @@ func getHttpStatus(HttpStatusMap map[string]uint64, HttpStatus string, limit int
         buffer = fmt.Sprintf("%s[%s : %d] ", buffer, kv.Key, kv.Value)
     }
 
-    // This trims the last white space and returns the buffer
-    // using the HttpStatusMap format.
+    // returns the buffer using the HttpStatusMap format.
     return fmt.Sprintf(HttpStatus, buffer)
 }

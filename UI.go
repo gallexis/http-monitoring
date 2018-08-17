@@ -54,7 +54,6 @@ func (ui UiLayouts) display() {
         termui.NewRow(
             termui.NewCol(12, 0, ui.Info)))
 
-    // calculate layout
     termui.Body.Align()
 }
 
@@ -63,15 +62,15 @@ func (ui UiLayouts) EventLoop() {
     for {
         select {
 
-        case metrics := <-DisplayMonitoringDataChan:
-            ui.MonitoringData.Items = metrics.Display()
+        case monitoringData := <-DisplayMonitoringDataChan:
+            ui.MonitoringData.Items = monitoringData.Display()
 
-        case metrics := <-DisplayTrafficAlertChan:
-            ui.LastAlert.Text = metrics.LastAlertMessage
-            ui.AlertsHistory.Items = metrics.ringToStringArray(metrics.Alerts)
+        case monitoringData := <-DisplayTrafficAlertChan:
+            ui.LastAlert.Text = monitoringData.LastAlertMessage
+            ui.AlertsHistory.Items = monitoringData.ringToStringArray(monitoringData.Alerts)
 
-        case metrics := <-DisplayLogLineChan:
-            ui.Log.Items = metrics.ringToStringArray(metrics.LogLines)
+        case monitoringData := <-DisplayLogLineChan:
+            ui.Log.Items = monitoringData.ringToStringArray(monitoringData.LogLines)
         }
 
         // Refresh the UI with the updated data
