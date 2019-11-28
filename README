@@ -1,7 +1,3 @@
-I couldn 't use docker because, the termui library i'm using is buggy in docker, and I found out why :
-https://github.com/gizak/termui/issues/116
-
-
 Run the program :
 - go build && ./http-monitoring
 - I'm using https://github.com/kiritbasu/Fake-Apache-Log-Generator to generate the log lines
